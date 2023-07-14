@@ -2,13 +2,554 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-	<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" name="viewport">
-    <title>Title</title>
-    
+    <title>雾霾探测系统设计</title>
+    <!-- <meta http-equiv="Access-Control-Allow-Origin" content="*" /> -->
+
+    <script type="text/javascript" src="https://api.map.baidu.com/api?v=1.0&type=webgl&ak=oQGh6UVNjMBitCjDYDlZYPLwbFqzoAwZ"></script>
+    <!--    这个是用来定位当前位置-->
+    <script type="text/javascript" src="http://api.map.baidu.com/api?v=2.0&ak=oQGh6UVNjMBitCjDYDlZYPLwbFqzoAwZ"></script>
+    <script src="./dependency/axios-0.18.0.js"></script>
+    <script src="./dependency/vue.js"></script>
+    <link rel="stylesheet" href="./dependency/element-ui/lib/theme-chalk/index.css">
+    <!-- <link rel="stylesheet" href="../../plugins/elementui/element-ui/lib/theme-chalk/index.css"> -->
+    <!-- 引入组件库 -->
+    <script src="./dependency/element-ui/lib/index.js"></script>
+    <!-- <script src="../../plugins/elementui/element-ui/lib/index.js"></script> -->
+    <script src="./dependency/echarts.min.js"></script>
+
+    <link rel="stylesheet" href="./dependency/qweather-icons.css">
 </head>
-<body>
-<h1>helloworld！！！！</h1>
+<body >
+<div id="app" >
+    <el-container>
+        <el-aside width="600px">
+            <div id="container" style="width: 570px;height: 570px"></div>
+
+            点击位置:<i class="el-icon-star-off"></i>{{templng}}--{{templat}}--{{tempcityName}}
+            <p></p>
+            <b>保存位置:<i class="el-icon-star-on"></i>{{lng}}--{{lat}}--{{cityName}}</b>
+            <p></p>
+            <el-button @click="sureAndMove()">确定点击位置并且转移</el-button>
+            <el-button @click="getLocationAndCity()">获取当前位置</el-button>
+        </el-aside>
+        <el-container>
+            <el-header height="70px">
+                <el-button @click="exp()">获取数据</el-button>
 
 
+                <el-button  @click="dialogTableVisible = true;getmanyfactor()"   >打开空气指数</el-button>
+                <el-button type="primary" icon="el-icon-edit" circle @click="drawdata()" >画图</el-button>
+                <el-button type="primary" icon="el-icon-magic-stick" @click="drawfuture()">绘图2</el-button>
+                <el-popover
+                        placement="top"
+                        width="300"
+                        trigger="click">
+                    <table>
+
+                        <ul>
+                            <i>空气质量:    </i>{{now.aqi}}
+                        </ul>
+                        <ul>
+                            <i>等级:  </i>{{now.category}}
+                        </ul>
+                        <ul>
+                            <b>目前主要污染:  </b>
+                            <i class="el-icon-loading">{{now.primary}}</i>
+                        </ul>
+                        <ul>
+                            <i>pm10值:   </i>{{now.pm10}}
+                        </ul>
+                        <ul>
+                            <i>pm2.5值:  </i>{{now.pm2p5}}
+                        </ul>
+                        <ul>
+                            <i>二氧化氮值:   </i>{{now.no2}}
+                        </ul>
+                        <ul>
+                            <i>二氧化硫值:   </i>{{now.so2}}
+                        </ul>
+                        <ul>
+                            <i>一氧化碳值:   </i>{{now.co}}
+                        </ul>
+                        <ul>
+                            <i>臭氧值: </i>{{now.o3}}
+                        </ul>
+                    </table>
+
+                    <el-button slot="reference">点击查看当前空气质量</el-button>
+                </el-popover>
+                <el-button @click="savetolocal()">保存到本地</el-button>
+                <el-button @click="clearlocalcookie()">清除缓存</el-button>
+                <br>
+                <p style="font: icon;color: #14EEFF">获取数据的城市为:{{cityName}}</p>
+            </el-header>
+
+
+            <el-main>
+                
+                    <el-descriptions size="mini"   v-for="co in count" direction=" horizontal" :column="5">
+                        <el-descriptions-item label="时间" >
+                            {{day7time[co]}}
+                        </el-descriptions-item>
+                    <el-descriptions-item label="白天天气" >
+                        <i :class="iconDay[co]"></i>
+                        {{textDay[co]}}
+                    </el-descriptions-item>
+                        <el-descriptions-item label="晚上天气" >
+                            <i :class="iconNight[co]"></i>
+                            {{textNight[co]}}
+                        </el-descriptions-item>
+                        <el-descriptions-item label="最高温度" >
+                            {{tempMax[co]}}°C
+                        </el-descriptions-item>
+                        <el-descriptions-item label="最低温度" >
+                            {{tempMin[co]}}°C
+                        </el-descriptions-item>
+
+                </el-descriptions>
+                
+
+
+                <div id="main" style="width: 700px;height:600px;"></div>
+            </el-main>
+        </el-container>
+    </el-container>
+
+
+    <el-dialog title="天气指数" :visible.sync="dialogTableVisible" width="70%">
+        <el-table
+                :data="factor"
+                style="width: 100%">
+            <el-table-column type="expand">
+                <template slot-scope="props">
+                    <el-form label-position="left" inline class="demo-table-expand">
+                        <i class="el-icon-loading"></i>
+                        <el-form-item label="建议:" >
+                            <span>{{ props.row.text }}</span>
+                        </el-form-item>
+                    </el-form>
+                </template>
+            </el-table-column>
+            <el-table-column
+                    label="序号"
+                    prop="type">
+            </el-table-column>
+            <el-table-column
+                    label="指数名称"
+                    prop="name">
+            </el-table-column>
+            <el-table-column
+                    label="等级"
+                    prop="level">
+            </el-table-column>
+            <el-table-column
+                    label="等级类别"
+                    prop="category">
+            </el-table-column>
+        </el-table>
+    </el-dialog>
+
+</div>
+
+<script>
+
+    var vue = new Vue({
+        el:"#app",
+        data:{
+            ///
+            picurl:["./picture/common.png"
+            ,"./picture/rainy.png",
+                "./picture/sunny.png"
+            ]
+            ,
+
+            //对话框弹出
+            dialogTableVisible:false,
+
+            //维度和经度和城市名地图
+            map:{},
+            lng:"",
+            lat:"",
+            cityName:"",
+            //暂时保存纬竞度
+            templng:"",
+            templat:"",
+            tempcityName:"",
+
+            //未来的时间段、温度、湿度数值
+            humiditydata:[],
+            tempdata:[],
+            futuretime:[],
+
+            //未来七天天气预报
+            count: [],
+            day7time:[],
+            tempMax:[],
+            tempMin:[],
+            iconDay:[],
+            iconNight:[],
+            textDay:[],
+            textNight:[],
+            humidity:[],
+
+
+
+            //当天空气质量
+            now:[],
+
+            //运动指数、洗车指数等等.....
+            factor:[],
+
+        },
+        mounted(){
+            var that = this;
+            document.body.style.backgroundImage="url("+this.picurl[2]+")";
+
+            var item = localStorage.getItem("SaveData");
+            var parse = JSON.parse(item);
+            Object.assign(that.$data,parse);
+
+            map = new BMapGL.Map('container');
+            if(that.cityName==null||(that.cityName.length==0||(that.lng.length==0||that.length==0))){
+                map.centerAndZoom(new BMapGL.Point(116.331398,39.897445), 13);
+            }
+            else{
+                map.centerAndZoom({"lng":that.lng , "lat":that.lat}, 12);
+            }
+
+            map.enableScrollWheelZoom(true);
+            var geoc = new BMapGL.Geocoder();
+            map.addEventListener('click', function(e){
+                var pt = e.latlng;
+                that.templat=pt.lat;
+                that.templng=pt.lng;
+                geoc.getLocation(pt, function(rs){
+                    var addComp = rs.addressComponents;
+                    that.tempcityName=addComp.city;
+                    //alert(addComp.province + ", " + addComp.city + ", " + addComp.district + ", " + addComp.street + ", " + addComp.streetNumber);
+                })
+            })
+        },
+        methods:{
+
+
+            //获取数据
+            exp(){
+                var that = this;
+
+                if(that.lng==null||that.lng.length==0){
+                    this.$message.error("获取失败");
+                }
+                else {
+                    
+                    that.getweatherfuture();
+                    that.getmanyfactor();
+                    that.getnowdayair();
+                    that.get7day();
+                    this.$message({
+                        message: '获取成功',
+                        type: 'success',
+                        duration: 1000
+                    })  ;
+                }
+
+            },
+
+            //清除缓存
+            clearlocalcookie(){
+                localStorage.removeItem("SaveData");
+                this.$message({
+                    message: '清除成功',
+                    type: 'success',
+                    duration: 1000
+                });
+            },
+
+
+            //保存到本地
+            savetolocal(){
+                var that = this;
+
+                if(that.cityName==null||(that.cityName.length==0||(that.lng.length==0||that.length==0))){
+                    this.$message.error("保存失败");
+                }
+                else {
+                    var s = JSON.stringify(that.$options.data());
+                    localStorage.setItem("SaveData",s);
+                    this.$message({
+                        message: '保存成功',
+                        type: 'success',
+                        duration: 1000
+                    });}
+
+
+            },
+
+            //绘未来七天温度湿度图
+            drawfuture(){
+              var that = this;
+              var myChart = echarts.init(document.getElementById('main'));
+                myChart.clear();
+                option = {
+                    title: {
+                        text: '未来七天温度湿度'
+                    },
+                    tooltip: {
+                        trigger: 'axis'
+                    },
+                    legend: {},
+                    xAxis: {
+                        type: 'category',
+                        boundaryGap: false,
+                        data: that.day7time,
+                    },
+                    yAxis:[{
+                        type: 'value',
+                        name: '温度',
+                        min: -40,
+                        max: 60,
+                        position: 'left',
+                        axisLabel: {
+                            formatter: '{value} °C'
+                        }
+                    },
+                        {
+                            type: 'value',
+                            name: '湿度',
+                            min: 0,
+                            max: 100,
+                            position: 'right',
+                            axisLabel: {
+                                formatter: '{value}  %RH'
+                            }
+                        }],
+                    series: [
+                        {
+                            name: '最高温度',
+                            type: 'line',
+                            data: that.tempMax,
+                            color: '#ED6F4A',
+                            yAxisIndex: 0,
+                            markPoint: {
+                                data: [
+                                    { type: 'max', name: 'Max' },
+                                    { type: 'min', name: 'Min' }
+                                ]
+                            },
+                            markLine: {
+                                data: [{ type: 'average', name: 'Avg' }]
+                            }
+                        },
+                        {
+                            name: '最低温度',
+                            type: 'line',
+                            data: that.tempMin,
+                            color: '#6BF0E9',
+                            yAxisIndex: 0,
+                            markPoint: {
+                                data: [
+                                    { type: 'max', name: 'Max' },
+                                    { type: 'min', name: 'Min' }
+                                ]
+                            },
+                            markLine: {
+                                data: [{ type: 'average', name: 'Avg' }]
+                            }
+                        },
+                        {
+                            name: '湿度',
+                            type: 'line',
+                            data: that.humidity,
+                            color: '#D4AC0D',
+                            yAxisIndex: 1,
+                            markPoint: {
+                                data: [
+                                    { type: 'max', name: 'Max' },
+                                    { type: 'min', name: 'Min' }
+                                ]
+                            },
+                            markLine: {
+                                data: [{ type: 'average', name: 'Avg' }]
+                            }
+                        }
+                    ]
+                };
+                myChart.setOption(option);
+            },
+
+
+
+            //绘未来一天内不同时段图图
+            drawdata(){
+                var that = this;
+                var myChart = echarts.init(document.getElementById('main'));
+                myChart.clear();
+                option = {
+                    title: {
+                        text: '未来一天内不同时段温度和湿度'
+                    },
+                    tooltip: {
+                        trigger: 'axis',
+                        axisPointer: { type: 'cross' }
+                    },
+                    legend: {},
+                    xAxis: [
+                        {
+                            type: 'category',
+                            axisTick: {
+                                alignWithLabel: true
+                            },
+                            data: that.futuretime
+                        }
+                    ],
+                    yAxis: [
+                        {
+                            type: 'value',
+                            name: '温度',
+                            min: -40,
+                            max: 60,
+                            position: 'left',
+                            axisLabel: {
+                                formatter: '{value} °C'
+                            }
+                        },
+                        {
+                            type: 'value',
+                            name: '湿度',
+                            min: 0,
+                            max: 100,
+                            position: 'right',
+                            axisLabel: {
+                                formatter: '{value}  %RH'
+                            }
+                        }
+                    ],
+                    series: [
+                        {
+                            name: '温度',
+                            type: 'line',
+                            yAxisIndex: 0,
+                            smooth: true,
+                            color: '#ED6F4A',
+                            data:that.tempdata
+                        },
+                        {
+                            name: '湿度',
+                            type: 'line',
+                            smooth: true,
+                            color: '#6BF0E9',
+                            yAxisIndex: 1,
+                            data:that.humiditydata
+                        }
+                    ]
+                };
+                myChart.setOption(option);
+            },
+            //获取多种指数
+            getmanyfactor(){
+                var that = this;
+                var url="https://devapi.qweather.com/v7/indices/1d?type=0&location="+that.lng+","+that.lat+"&key=b9aff2ae4db54b439af3d4eeba46acde";
+                axios.get(url).then((res)=>{
+                    that.factor = res.data.daily;
+                });
+            },
+
+            //获取当天的空气质量
+            getnowdayair(){
+                var that = this;
+                var url="https://devapi.qweather.com/v7/air/now?location="+that.lng+","+that.lat+"&key=b9aff2ae4db54b439af3d4eeba46acde";
+                axios.get(url).then((res)=>{
+                    that.now=res.data.now;
+                });
+            }
+
+            ,
+            //获取未来一天内不同时段的天气指数
+            getweatherfuture(){
+                var that = this;
+                var url="https://devapi.qweather.com/v7/grid-weather/24h?location="+that.lng+","+that.lat+"&key=b9aff2ae4db54b439af3d4eeba46acde";
+                axios.get(url).then((res)=>{
+                    that.humiditydata=[];
+                    that.tempdata=[];
+                    that.futuretime=[];
+                    for (var i = 0; i < res.data.hourly.length; i++) {
+                        that.humiditydata.push(res.data.hourly[i].humidity);
+                        that.tempdata.push(res.data.hourly[i].temp);
+                        that.futuretime.push(res.data.hourly[i].fxTime);
+                    }
+                });
+            },
+
+            //获取未来7天的天气
+            get7day(){
+              var that = this;
+              var url="https://devapi.qweather.com/v7/weather/7d?location="+that.lng+","+that.lat+"&key=b9aff2ae4db54b439af3d4eeba46acde";
+              axios.get(url).then((res)=>{
+                  var daily = res.data.daily;
+                  that.day7time=[];
+                  that.tempMax=[];
+                  that.tempMin=[];
+                  that.iconDay=[];
+                  that.iconNight=[];
+                  that.textDay=[];
+                  that.textNight=[];
+                  that.count=[];
+                  that.humidity=[];
+                  for (var i = 0; i < daily.length; i++) {
+                      that.count.push(i);
+                      that.day7time.push(daily[i].fxDate);
+                      that.tempMax.push(daily[i].tempMax);
+                      that.tempMin.push(daily[i].tempMin);
+                      that.iconDay.push("qi-"+daily[i].iconDay+"-fill");
+                      that.iconNight.push("qi-"+daily[i].iconNight+"-fill");
+                      that.textDay.push(daily[i].textDay);
+                      that.textNight.push(daily[i].textNight);
+                      that.humidity.push(daily[i].humidity);
+                  }
+                  //console.log(that.humidity);
+              });
+            },
+
+
+            //获取城市和定位地址
+            getLocationAndCity(){
+                var that = this;
+
+                function myFun(result){
+                    that.cityName=result.name;
+                }
+                var myCity = new BMapGL.LocalCity();
+                myCity.get(myFun);
+
+                var geolocation = new BMap.Geolocation();
+                geolocation.getCurrentPosition(function(r){
+                    if(this.getStatus() == BMAP_STATUS_SUCCESS){
+                        that.lng=r.point.lng;
+                        that.lat=r.point.lat;
+                    }
+                    else {
+                        alert('获取地址失败:'+this.getStatus());
+                    }
+                },{enableHighAccuracy: true})
+                map.centerAndZoom({"lng":that.lng , "lat":that.lat}, 12);
+            },
+            //确定位置并且转移
+            sureAndMove(){
+                var that = this;
+                if(that.templat==null||(that.templat.length==0||(that.templng.length==0||that.tempcityName.length==0))){
+                    this.$message.error("定位失败，请重新从地图获取数据");
+                }
+                else {
+                    that.lat=that.templat;
+                    that.lng=that.templng;
+                    that.cityName=that.tempcityName;
+                    map.centerAndZoom({"lng":that.lng , "lat":that.lat}, 12);
+                }
+
+            }
+
+        }
+    });
+</script>
 </body>
 </html>
